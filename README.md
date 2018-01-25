@@ -91,7 +91,7 @@ $ make
 
 ### ビルドに失敗する
 
-submoduleをcloneしていない場合(--recursiveをつけずにcloneした場合など)にはビルドに失敗します。
+submoduleをcloneしていない場合(--recursiveをつけずにcloneした場合など)にはビルドが失敗します。
 
 ```
 $ git submodule init
