@@ -21,6 +21,12 @@ configure_file(${HTML_TEMPLATE} "${CMAKE_CURRENT_BINARY_DIR}/pasori_test.html")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/tests/pasori_test")
 target_link_libraries(pasori_test pafe)
 
+add_executable(felica_dump "${LIBPAFE_DIR}/tests/felica_dump.c")
+set(JS_FILENAME "felica_dump.js")
+configure_file(${HTML_TEMPLATE} "${CMAKE_CURRENT_BINARY_DIR}/felica_dump.html")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/tests/pasori_test")
+target_link_libraries(felica_dump pafe)
+
 configure_file(${LIBPAFE_DIR}/src/libpafe.h ${CMAKE_CURRENT_BINARY_DIR}/libpafe/libpafe.h COPYONLY)
 set(JS_FILENAME "suica_dump.js")
 configure_file(${HTML_TEMPLATE} "${CMAKE_CURRENT_BINARY_DIR}/suica_dump.html")
