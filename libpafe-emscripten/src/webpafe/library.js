@@ -1,17 +1,5 @@
 //"use strict";
 
-var mylib = {
-    my_js__deps: ['$EmterpreterAsync'],
-    my_js: function () {
-        return EmterpreterAsync.handle(function (resume) {
-            alert('hi');
-        });
-    },
-};
-
-mergeInto(LibraryManager.library, mylib);
-
-
 var webpasori = {
     usbDevice: undefined,
     epNumber: -1,
