@@ -71,8 +71,8 @@ $ make
 .
 ├── felica_dump.html
 ├── felica_dump.js
-├──libpafe-emscripten
-│  └── libpafe.a
+├── libpafe-emscripten
+│   └── libpafe.a
 ├── pasori_test.html
 ├── pasori_test.js
 ├── suica_dump.html
