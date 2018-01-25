@@ -1,6 +1,6 @@
 #pragma once
 
-extern int webpasori_openusb(int productId, int vendorIdS310, int vendorIdS320, int vendorIdS330);
+extern int webpasori_openusb(int vendorId, int productIdS310, int productIdS320, int productIdS330);
 extern int webpasori_get_reader_type(void);
 extern int webpasori_closeusb(void);
 extern int webpasori_get_endpoints(void);
