@@ -1,0 +1,2 @@
+#cmakedefine HAVE_LIBUSB_1
+#cmakedefine HAVE_WEBUSB
