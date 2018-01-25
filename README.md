@@ -54,6 +54,14 @@ libusbを利用してクロスプラットフォームのソースコード互�
 
 ## ビルドについて
 
+### ビルド環境
+
+ * Emscripten(1.37.28で確認済)
+ * CMake(3.5.1で確認)
+ * GNU MakeやClang一式
+
+Ubuntu16.04にbuild-essentialとclang、cmakeパッケージを入れた状態にEmscripten環境を構築したものに類似するWSL上の環境でビルド確認をおこないました。
+
 ### ビルド手順
 
 ```
