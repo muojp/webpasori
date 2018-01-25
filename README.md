@@ -31,7 +31,7 @@
    * FeliCaのデータダンプ([元リポジトリ](https://github.com/rfujita/libpafe/) by @rfujita and @htrb)
      * https://muojp.github.io/webpasori/pasori_test.html
    * Suicaの履歴ダンプ([元リポジトリ](https://github.com/temmings/suica-dump/) by @temmings)
-     * https://muojp.github.io/webpasori/dump_suica.html
+     * https://muojp.github.io/webpasori/suica_dump.html
  * ※注意: 上記デモページ群では、端末に接続されたPaSoRiやそれを経由して読み取ったFeliCaに関する情報を一切外部に送信していませんが、原理上は容易に送信可能であることを認識した上で読み取り確認をおこなってください
 
 ## 移植の目的
