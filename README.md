@@ -57,7 +57,7 @@ libusbを利用してクロスプラットフォームのソースコード互�
 ### ビルド環境
 
  * Emscripten(1.37.28で確認済)
- * CMake(3.5.1で確認)
+ * CMake(3.5.1で確認済)
  * GNU MakeやClang一式
 
 Ubuntu16.04にbuild-essentialとclang、cmakeパッケージを入れた状態にEmscripten環境を構築したものに類似するWSL上の環境でビルド確認をおこないました。
@@ -91,7 +91,7 @@ $ make
 
 ### ビルドに失敗する
 
-submoduleをcloneしていない場合にはビルドに失敗します。
+submoduleをcloneしていない場合(--recursiveをつけずにcloneした場合など)にはビルドに失敗します。
 
 ```
 $ git submodule init
