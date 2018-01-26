@@ -371,10 +371,6 @@ pasori_list_passive_target(pasori *pp, unsigned char *payload, int *size)
   n = *size;
   memcpy(cmd + 4, payload, n);
   n += 4;
-#if defined(HAVE_WEBUSB)
-  // FIXME: inspect why removing this printf make polling functionality broken
-  printf("");
-#endif
   r = pasori_packet_write(pp, cmd, &n);
   *size = n - 4;
 
@@ -826,7 +822,12 @@ open_usb(pasori *pp)
     return PASORI_ERR_TYPE;
   }
   get_end_points(pp);
-  ret = webpasori_claim_interface(INTERFACE_NUMBER);
+  if (webpasori_select_configuration(1)) {
+    return PASORI_ERR_COM;
+  }
+  if (webpasori_claim_interface(INTERFACE_NUMBER)) {
+    return PASORI_ERR_COM;
+  }
   return 0;
 #else  /* HAVE_LIBUSB_1 */
   struct usb_bus *bus;
@@ -941,6 +942,7 @@ pasori_send(pasori *pp, uint8 *data, int *size)
     i = libusb_control_transfer(pp->dh, LIBUSB_REQUEST_TYPE_VENDOR, 0, 0, 0, data, *size, pp->timeout);
 #elif defined(HAVE_WEBUSB)  /* HAVE_LIBUSB_1 */
 // TODO: support WebUSB
+    i = webusb_control_transfer_out("vendor", "device", 0, 0, 0, data, *size);
 #else  /* HAVE_LIBUSB_1 */
     i = usb_control_msg(pp->dh, USB_TYPE_VENDOR, 0, 0, 0, data, *size, pp->timeout);
 #endif	/* HAVE_LIBUSB_1 */
@@ -958,10 +960,6 @@ pasori_send(pasori *pp, uint8 *data, int *size)
     return PASORI_ERR_TYPE;
   }
 
-#if defined(HAVE_WEBUSB)
-  // FIXME: inspect why removing this printf make polling functionality broken
-  printf("%d", i);
-#endif
   if (i < 0)
     return PASORI_ERR_COM;			/* FIXME:HANDLE INVALID RESPONSES */
 
@@ -980,6 +978,8 @@ pasori_send(pasori *pp, uint8 *data, int *size)
     i = libusb_interrupt_transfer(pp->dh, pp->i_ep_in, resp, sizeof(resp), &length, pp->timeout);
 #elif defined(HAVE_WEBUSB)  /* HAVE_LIBUSB_1 */
 // TODO: support WebUSB
+    length = webusb_rw_transfer_in(resp, sizeof(resp));
+    i = 0;
 #else  /* HAVE_LIBUSB_1 */
     i = usb_interrupt_read(pp->dh, pp->i_ep_in, resp, sizeof(resp), pp->timeout);
 #endif	/* HAVE_LIBUSB_1 */
@@ -1050,6 +1050,8 @@ pasori_recv(pasori *pp, uint8 *data, int *size)
     length = *size;
     i = libusb_interrupt_transfer(pp->dh, pp->i_ep_in, data, length, size, pp->timeout);
 #elif defined(HAVE_WEBUSB)  /* HAVE_LIBUSB_1 */
+    length = webusb_rw_transfer_in(data, *size);
+    i = 0;
 // TODO: support WebUSB
 #else  /* HAVE_LIBUSB_1 */
     i = usb_interrupt_read(pp->dh, pp->i_ep_in, data, *size, pp->timeout);
@@ -1061,6 +1063,7 @@ pasori_recv(pasori *pp, uint8 *data, int *size)
     i = libusb_bulk_transfer(pp->dh, pp->b_ep_in, data, length, size, pp->timeout);
 #elif defined(HAVE_WEBUSB)  /* HAVE_LIBUSB_1 */
     length = webusb_rw_transfer_in(data, *size);
+    i = 0;
 #else  /* HAVE_LIBUSB_1 */
     i = usb_bulk_read(pp->dh, pp->b_ep_in, data, *size, pp->timeout);
 #endif
@@ -1069,15 +1072,12 @@ pasori_recv(pasori *pp, uint8 *data, int *size)
     return PASORI_ERR_TYPE;
   }
 
-#ifdef HAVE_LIBUSB_1		/* HAVE_LIBUSB_1 */
+#if defined(HAVE_LIBUSB_1) || defined(HAVE_WEBUSB)
   if (i) {
     Log("(recv) ERROR %d\n", i);
     return PASORI_ERR_COM;
   }
   i = length;
-#elif defined(HAVE_WEBUSB)  /* HAVE_LIBUSB_1 */
-  // TODO: support WebUSB
-  // TODO: actually, need to handle inner exceptions.
 #else
   if (i < 0) {
     Log("(recv) ERROR\n");

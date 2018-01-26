@@ -64,7 +64,7 @@ var webpasori = {
         }
         // (re)initialize endpoint Number
         this.epNumber = -1;
-        this.usbDevice.configuration.interfaces.forEach(function(iface) {
+        this.usbDevice.configurations[0].interfaces.forEach(function(iface) {
             iface.alternates.forEach(function(alt) {
                 alt.endpoints.forEach(function(ep) {
                     if (ep.type === 'bulk' && ep.direction === 'in') {
@@ -76,12 +76,29 @@ var webpasori = {
                         console.log('found bulk-out');
                     }
                     else if (ep.type === 'interrupt' && ep.direction === 'in') {
+                        this.epNumber = ep.endpointNumber;
                         console.log('found interrupt-in');
                     }
                 });
             });
         });
         return this.epNumber === -1 ? -1 : 0;
+    },
+    webpasori_select_configuration__deps: ['$EmterpreterAsync'],
+    webpasori_select_configuration: function(num) {
+        if (this.usbDevice === undefined) {
+            return -1;
+        }
+        return EmterpreterAsync.handle(function (resume) {
+            this.usbDevice.selectConfiguration(num)
+            .then(function() {
+                console.log('USB configuration set.');
+                resume(function() { return 0; });
+            })
+            .catch(function() {
+                resume(function() { return -2; });
+            });
+        });
     },
     webpasori_claim_interface__deps: ['$EmterpreterAsync'],
     webpasori_claim_interface: function(num) {
@@ -128,6 +145,29 @@ var webpasori = {
                 }
                 resume(function() { return ret.data.byteLength; });
             });
+        });
+    },
+    webusb_control_transfer_out__deps: ['$EmterpreterAsync'],
+    webusb_control_transfer_out: function(requestType, recipient, request, value, index, data, size) {
+        if (this.usbDevice === undefined) {
+            return -1;
+        }
+        var setup = {
+            requestType: Pointer_stringify(requestType),
+            recipient: Pointer_stringify(recipient),
+            request: request,
+            value: value,
+            index: index
+        };
+        var buf = new ArrayBuffer(size);
+        var arr = new Uint8Array(buf, 0, buf.length);
+        for (var cnt = 0; cnt !== size; ++cnt) {
+            arr[cnt] = getValue(data + cnt, 'i8');
+        }
+        // assume all bytes are written successfully
+        return EmterpreterAsync.handle(function (resume) {
+            this.usbDevice.controlTransferOut(setup, buf)
+            .then(resume(function() { return size; }));
         });
     }
 };
