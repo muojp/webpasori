@@ -14,6 +14,12 @@
 
 をWeb用に変換したものを用意しました。
 
+### 動作例
+
+ * Lenovo Phab 2 Pro(Android 6.0) + RC-S330でfelica_dumpサンプルを利用してEdyの公開領域を読み取ったところ
+
+![phab-2-pro-edy](https://muojp.github.io/webpasori/webpasori-demo.jpg)
+
 ## 動作環境
 
  * PaSoRi RC-S330
