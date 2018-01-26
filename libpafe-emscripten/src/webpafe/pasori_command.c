@@ -950,7 +950,6 @@ pasori_send(pasori *pp, uint8 *data, int *size)
     i = libusb_bulk_transfer(pp->dh, pp->b_ep_out, data, *size, &length, pp->timeout);
 #elif defined(HAVE_WEBUSB)  /* HAVE_LIBUSB_1 */
     i = webusb_rw_transfer_out(data, *size);
-// TODO: support WebUSB
 #else  /* HAVE_LIBUSB_1 */
     i = usb_bulk_write(pp->dh, pp->b_ep_out, data, *size, pp->timeout);
 #endif	/* HAVE_LIBUSB_1 */
@@ -989,7 +988,6 @@ pasori_send(pasori *pp, uint8 *data, int *size)
 #ifdef HAVE_LIBUSB_1		/* HAVE_LIBUSB_1 */
     i = libusb_bulk_transfer(pp->dh, pp->b_ep_in, resp, sizeof(resp), &length, pp->timeout);
 #elif defined(HAVE_WEBUSB)  /* HAVE_LIBUSB_1 */
-    // TODO: support WebUSB
     length = webusb_rw_transfer_in(resp, sizeof(resp));
 #else  /* HAVE_LIBUSB_1 */
     i = usb_bulk_read(pp->dh, pp->b_ep_in, resp, sizeof(resp), pp->timeout);
@@ -1062,7 +1060,6 @@ pasori_recv(pasori *pp, uint8 *data, int *size)
     length = *size;
     i = libusb_bulk_transfer(pp->dh, pp->b_ep_in, data, length, size, pp->timeout);
 #elif defined(HAVE_WEBUSB)  /* HAVE_LIBUSB_1 */
-    // TODO: support WebUSB
     length = webusb_rw_transfer_in(data, *size);
 #else  /* HAVE_LIBUSB_1 */
     i = usb_bulk_read(pp->dh, pp->b_ep_in, data, *size, pp->timeout);
