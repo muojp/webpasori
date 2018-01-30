@@ -41,6 +41,9 @@ struct tag_pasori
 #define PASORIUSB_PRODUCT_S310 0x006c
 #define PASORIUSB_PRODUCT_S320 0x01bb
 #define PASORIUSB_PRODUCT_S330 0x02e1
+#define PASORIUSB_PRODUCT_S380 0x06c3
+
+static void dbg_dump(unsigned char *b, uint8 size);
 
 #define TIMEOUT 1000
 
@@ -76,6 +79,15 @@ static const uint8 S330_RF_ANTENNA_OFF[] = { 0xD4, 0x32, 0x01, 0x00 };
 static const uint8 S330_GET_VERSION[] = { 0xD4, 0x02 };
 static const uint8 S330_DESELECT[] = { 0xD4, 0x44, 0x01 };
 
+static const uint8 S380_INIT[] = { 0x00, 0x00, 0xff, 0x00, 0xff, 0x00 };
+static const uint8 S380_SET_COMMAND_TYPE[] = { 0x2A, 0x01 };
+static const uint8 S380_SWITCH_RF[] = { 0x06, 0x00 };
+static const uint8 S380_IN_SET_RF[] = { 0x00, 0x01, 0x01, 0x0f, 0x01 };
+static const uint8 S380_IN_SET_PROTOCOL1[] = {
+  0x02, 0x00, 0x18, 0x01, 0x01, 0x02, 0x01, 0x03, 0x00, 0x04, 0x00, 0x05, 0x00, 0x06, 0x00, 0x07, 0x08,
+  0x08, 0x00, 0x09, 0x00, 0x0a, 0x00, 0x0b, 0x00, 0x0c, 0x00, 0x0e, 0x04, 0x0f, 0x00, 0x10, 0x00, 0x11,
+  0x00, 0x12, 0x00 };
+static const uint8 S380_IN_SET_PROTOCOL2[] = { 0x02, 0x00, 0x18 };
 
 #define DATASIZE 255
 
@@ -251,6 +263,7 @@ pasori_packet_write(pasori *p, uint8 *data, int *size)
 {				/* RAW Packet SEND */
   uint8 cmd[DATASIZE + 1];
   uint8 sum;
+  uint8 len_header;
   int i, n;
 
   if (p == NULL || data == NULL || size == NULL)
@@ -263,24 +276,46 @@ pasori_packet_write(pasori *p, uint8 *data, int *size)
     return 0;
   }
 
-  if (n > DATASIZE - 7)
-    n = DATASIZE - 7;
+  len_header = p->type == PASORI_TYPE_S380 ? 11 : 7;
 
-  sum = checksum(data, n);
+  if (n > (DATASIZE - len_header))
+    n = DATASIZE - len_header;
 
-  cmd[0] = 0;
-  cmd[1] = 0;;
-  cmd[2] = 0xff;
-  cmd[3] = n;
-  cmd[4] = 0x100 - n;
-  memcpy(cmd + 5, data, n);
-  cmd[5 + n] = sum;
-  cmd[6 + n] = 0;
-  n += 7;
+  if (p->type == PASORI_TYPE_S380) {
+    // adjustment for header '0xd6' byte
+    n = n + 1;
+
+    cmd[0] = 0;
+    cmd[1] = 0;
+    cmd[2] = 0xff;
+    cmd[3] = 0xff;
+    cmd[4] = 0xff;
+    cmd[5] = n & 0xff;
+    cmd[6] = (n >> 8) & 0xff;
+    cmd[7] = checksum(cmd + 5, 2);
+    cmd[8] = 0xd6;
+    memcpy(cmd + 9, data, n - 1);
+    cmd[8 + n] = checksum(cmd + 8, n);
+    cmd[9 + n] = 0;
+    n += len_header - 1;
+  }
+  else {
+    sum = checksum(data, n);
+
+    cmd[0] = 0;
+    cmd[1] = 0;;
+    cmd[2] = 0xff;
+    cmd[3] = n;
+    cmd[4] = 0x100 - n;
+    memcpy(cmd + 5, data, n);
+    cmd[5 + n] = sum;
+    cmd[6 + n] = 0;
+    n += len_header;
+  }
 
   i = pasori_send(p, cmd, &n);
 
-  *size = n - 7;
+  *size = n - len_header;
   return i;
   /* FIXME:handle error */
 }
@@ -308,6 +343,30 @@ pasori_packet_read(pasori * p, uint8 * data, int *size)
 
   if (recv[0] != 0 || recv[1] != 0 || recv[2] != 0xff)
     return PASORI_ERR_COM;
+
+  if (p->type == PASORI_TYPE_S380) {
+    if (!(recv[3] == 0xff && recv[4] == 0xff)) {
+      // data/err should have 0xffff on recv[3:4]
+      return PASORI_ERR_COM;
+    }
+    if (n == 5) {
+      // err
+      return PASORI_ERR_FORMAT;
+    }
+    if (recv[8] != 0xd7) {
+      // we can perform further integrity check using recv[9] if cmd-code is available as function input
+      return PASORI_ERR_COM;
+    }
+    s = (recv[6] << 8) | recv[5];
+    // exclude response header
+    s -= 2;
+    if (s > n)
+      s = n;
+
+    memcpy(data, &recv[10], s);
+    *size = s;
+    return 0;
+  }
 
   if (recv[5] == 0x7f)
     return PASORI_ERR_FORMAT;
@@ -360,21 +419,38 @@ pasori_list_passive_target(pasori *pp, unsigned char *payload, int *size)
   if(pp == NULL || payload == NULL || size == NULL || *size < 0) 
     return PASORI_ERR_FORMAT;
 
-  if (pp->type != PASORI_TYPE_S330)
+  if (pp->type == PASORI_TYPE_S330) {
+    cmd[0] = 0xd4;
+    cmd[1] = 0x4a;
+    cmd[2] = 1;
+    cmd[3] = 0x01;
+
+    n = *size;
+    memcpy(cmd + 4, payload, n);
+    n += 4;
+    r = pasori_packet_write(pp, cmd, &n);
+    *size = n - 4;
+
+    return r;			/* FIXME:handle error */
+  }
+  else if (pp->type == PASORI_TYPE_S380) {
+    cmd[0] = 0x04;
+    // TODO: set desired timeout on cmd[1:2]
+    cmd[1] = 0x6e;
+    cmd[2] = 0x00;
+    cmd[3] = 0x06;
+
+    n = *size;
+    memcpy(cmd + 4, payload, n);
+    n += 4;
+    r = pasori_packet_write(pp, cmd, &n);
+    *size = n - 4;
+
+    return r;			/* FIXME:handle error */
+  }
+  else {
     return PASORI_ERR_TYPE;
-
-  cmd[0] = 0xd4;
-  cmd[1] = 0x4a;
-  cmd[2] = 1;
-  cmd[3] = 0x01;
-
-  n = *size;
-  memcpy(cmd + 4, payload, n);
-  n += 4;
-  r = pasori_packet_write(pp, cmd, &n);
-  *size = n - 4;
-
-  return r;			/* FIXME:handle error */
+  }
 }
 
 int
@@ -400,6 +476,13 @@ pasori_write(pasori *p, uint8 *data, int *size)
     cmd[1] = 0x42;
     cmd[2] = *size + 1;
     head_len = 3;
+    break;
+  case PASORI_TYPE_S380:
+    cmd[0] = 0x04;
+    cmd[1] = 0x1e;
+    cmd[2] = 0x00;
+    cmd[3] = *size + 1;
+    head_len = 4;
     break;
   default:
     return PASORI_ERR_TYPE;
@@ -445,6 +528,9 @@ pasori_read(pasori *p, uint8 *data, int *size)
       return PASORI_ERR_FORMAT;
     s = n;
     break;
+  case PASORI_TYPE_S380:
+    s = n;
+    break;
   default:
     return PASORI_ERR_TYPE;
   }
@@ -452,7 +538,14 @@ pasori_read(pasori *p, uint8 *data, int *size)
   if (s > *size)
     s = *size;
 
-  memcpy(data, recv + 2, s);
+  if (p->type == PASORI_TYPE_S380) {
+    memcpy(data, recv, s);
+    Log("read)) returning data:");
+    dbg_dump(recv, s);
+  }
+  else {
+    memcpy(data, recv + 2, s);
+  }
   *size = s;
 
   return 0;
@@ -461,6 +554,9 @@ pasori_read(pasori *p, uint8 *data, int *size)
 int
 pasori_init(pasori * p)
 {
+  uint8 recv[DATASIZE + 1];
+  int size;
+
   if (p == NULL)
     return PASORI_ERR_PARM;
 
@@ -480,6 +576,14 @@ pasori_init(pasori * p)
     break;
   case PASORI_TYPE_S330:
     pasori_init_test(p, S330_RF_ANTENNA_ON, sizeof(S330_RF_ANTENNA_ON));
+    break;
+  case PASORI_TYPE_S380:
+    // TODO: perform a soft-reset
+    pasori_init_test(p, S380_SET_COMMAND_TYPE, sizeof(S380_SET_COMMAND_TYPE));
+    pasori_init_test(p, S380_SWITCH_RF, sizeof(S380_SWITCH_RF));
+    pasori_init_test(p, S380_IN_SET_RF, sizeof(S380_IN_SET_RF));
+    pasori_init_test(p, S380_IN_SET_PROTOCOL1, sizeof(S380_IN_SET_PROTOCOL1));
+    pasori_init_test(p, S380_IN_SET_PROTOCOL2, sizeof(S380_IN_SET_PROTOCOL2));
     break;
   default:
     return PASORI_ERR_TYPE;
@@ -537,6 +641,10 @@ pasori_version(pasori *p, int *v1, int *v2)
     recv[1] = 0x02;
     n = 2;
     break;
+  case PASORI_TYPE_S380:
+    recv[0] = 0x20;
+    n = 1;
+    break;
   default:
     return PASORI_ERR_TYPE;
   }
@@ -561,6 +669,10 @@ pasori_version(pasori *p, int *v1, int *v2)
   case PASORI_TYPE_S330:
     *v1 = bcd2int(recv[3]);
     *v2 = bcd2int(recv[4]);
+    break;
+  case PASORI_TYPE_S380:
+    *v1 = bcd2int(recv[1]);
+    *v2 = bcd2int(recv[0]);
     break;
   default:
     return PASORI_ERR_TYPE;
@@ -756,7 +868,8 @@ open_usb(pasori *pp)
     if (desc.idVendor == PASORIUSB_VENDOR && 
 	(desc.idProduct == PASORIUSB_PRODUCT_S310 ||
 	 desc.idProduct == PASORIUSB_PRODUCT_S320 ||
-	 desc.idProduct == PASORIUSB_PRODUCT_S330)) {
+	 desc.idProduct == PASORIUSB_PRODUCT_S330 ||
+	 desc.idProduct == PASORIUSB_PRODUCT_S380)) {
 #ifdef DEBUG_USB
       Log("Device is found %04x:%04x\n", desc.idVendor, desc.idProduct);	/* debug */
 #endif
@@ -778,6 +891,9 @@ open_usb(pasori *pp)
     break;
   case PASORIUSB_PRODUCT_S330:
     pp->type = PASORI_TYPE_S330;
+    break;
+  case PASORIUSB_PRODUCT_S380:
+    pp->type = PASORI_TYPE_S380;
     break;
   default:
     return PASORI_ERR_TYPE;
@@ -804,7 +920,8 @@ open_usb(pasori *pp)
 
   return 0;
 #elif defined(HAVE_WEBUSB)  /* HAVE_LIBUSB_1 */
-  int ret = webpasori_openusb(PASORIUSB_VENDOR, PASORIUSB_PRODUCT_S310, PASORIUSB_PRODUCT_S320, PASORIUSB_PRODUCT_S330);
+  int ret = webpasori_openusb(
+    PASORIUSB_VENDOR, PASORIUSB_PRODUCT_S310, PASORIUSB_PRODUCT_S320, PASORIUSB_PRODUCT_S330, PASORIUSB_PRODUCT_S380);
   if (ret != 0) {
     return PASORI_ERR_COM;
   }
@@ -817,6 +934,9 @@ open_usb(pasori *pp)
     break;
   case PASORIUSB_PRODUCT_S330:
     pp->type = PASORI_TYPE_S330;
+    break;
+  case PASORIUSB_PRODUCT_S380:
+    pp->type = PASORI_TYPE_S380;
     break;
   default:
     return PASORI_ERR_TYPE;
@@ -871,6 +991,9 @@ open_usb(pasori *pp)
     break;
   case PASORIUSB_PRODUCT_S330:
     pp->type = PASORI_TYPE_S330;
+    break;
+  case PASORIUSB_PRODUCT_S380:
+    pp->type = PASORI_TYPE_S380;
     break;
   default:
     return PASORI_ERR_TYPE;
@@ -948,6 +1071,7 @@ pasori_send(pasori *pp, uint8 *data, int *size)
 #endif	/* HAVE_LIBUSB_1 */
     break;
   case PASORI_TYPE_S330:
+  case PASORI_TYPE_S380:
 #ifdef HAVE_LIBUSB_1		/* HAVE_LIBUSB_1 */
     i = libusb_bulk_transfer(pp->dh, pp->b_ep_out, data, *size, &length, pp->timeout);
 #elif defined(HAVE_WEBUSB)  /* HAVE_LIBUSB_1 */
@@ -985,6 +1109,7 @@ pasori_send(pasori *pp, uint8 *data, int *size)
 #endif	/* HAVE_LIBUSB_1 */
     break;
   case PASORI_TYPE_S330:
+  case PASORI_TYPE_S380:
 #ifdef HAVE_LIBUSB_1		/* HAVE_LIBUSB_1 */
     i = libusb_bulk_transfer(pp->dh, pp->b_ep_in, resp, sizeof(resp), &length, pp->timeout);
 #elif defined(HAVE_WEBUSB)  /* HAVE_LIBUSB_1 */
@@ -1058,6 +1183,7 @@ pasori_recv(pasori *pp, uint8 *data, int *size)
 #endif	/* HAVE_LIBUSB_1 */
     break;
   case PASORI_TYPE_S330:
+  case PASORI_TYPE_S380:
 #ifdef HAVE_LIBUSB_1		/* HAVE_LIBUSB_1 */
     length = *size;
     i = libusb_bulk_transfer(pp->dh, pp->b_ep_in, data, length, size, pp->timeout);
