@@ -22,15 +22,16 @@
 
 ## 動作環境
 
- * PaSoRi RC-S330, S320
+ * PaSoRi RC-S380, RC-S330, RC-S320(/S310)
    * S310について、実機での確認は出来ていませんが動作はするはずです
  * AndroidまたはmacOS版のGoogle Chrome 63+
    * Windows環境ではデバイスを認識しないようです
+   * 一般的なAndroid端末を利用する場合、参考写真のようにUSB-OTGケーブルでPaSoRiを接続する必要があります
 
 ## 簡単な動作確認方法
 
  * MacもしくはAndroid端末(6.0以上を推奨)を用意する
- * PaSoRi RC-S330またはS320を上記環境に接続する
+ * PaSoRi RC-S380/S330/S320(/S310)を上記環境に接続する
  * Chrome 63以上でデモページを開く
    * PaSoRiの認識とバージョン確認([元リポジトリ](https://github.com/rfujita/libpafe/) by @rfujita and @htrb)
      * https://muojp.github.io/webpasori/pasori_test.html
@@ -124,8 +125,24 @@ LAN内の環境で実行する場合、手元環境にてHTTPS待ち受けが必
 
 開発が落ち着いてきたらGitHub PagesやAmazon S3、Azure Storage (BLOB)などへhtml/jsファイルをアップロードして動作確認するのが楽です。
 
+### Gitリポジトリの更新に失敗する
+
+本家libpafeでサポートされていないRC-S380への対応のためにlibpafeをforkして数点の機能追加をおこないました。
+これに伴い、Git submoduleのマッピングを変更しました。
+
+`git pull` 実施時にsubmodule絡みのエラーが出る場合、
+
+```
+$ rm -r .git/modules/libpafe-emscripten/src/libpafe
+$ git submodule update -i
+```
+
+としてsubmoduleを取り込み直してください。
+これでもうまくいかなかったり、面倒であれば全体をcloneし直しても構いません。
+
 ## 移植方針/移植状況
 
  * なるべく外部リポジトリのコードに手を加えずにEmscriptenビルドを通したいところでしたが、libpafeの構造上本家へのパッチ無しにこれを実現するのは難しいと判断しました
  * 当初はS330のみをターゲットとして移植、その後にS320も移植ターゲットとして作業を完了しました。S310については実機へアクセスする手立てがなかったため、動作を確認できていません
    * S320への対応によって動作はするはずです
+ * その後、S380も暫定対応しました。あくまでもlibpasoriの領域に限定した移植で、S380の真価(P2PやHCEなど)は発揮できません
