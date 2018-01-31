@@ -1,6 +1,6 @@
 [submodule "libpafe-emscripten/src/libpafe"]
 	path = libpafe-emscripten/src/libpafe
-	url = https://github.com/rfujita/libpafe.git
+	url = https://github.com/muojp/libpafe.git
 	branch = master
 [submodule "tests/suica-dump"]
 	path = tests/suica-dump
